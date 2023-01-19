@@ -28,6 +28,9 @@ pre-commit = "2.20.0"
 lint = "pre-commit run --all-files"
 precommit = "pre-commit install"
 
+[tool.isort]
+multi_line_output = 3
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

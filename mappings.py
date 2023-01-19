@@ -2,6 +2,7 @@ from pyteal import abi
 
 
 class BountyProgram(abi.NamedTuple):
+    """A namedtuple representing a Bounty Program on the Contractorium Platform."""
+
     name: abi.Field[abi.String]
-    authorized_members: abi.Field[abi.DynamicArray[abi.Address]]
     description: abi.Field[abi.String]
