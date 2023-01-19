@@ -129,3 +129,5 @@ dmypy.json
 .pyre/
 
 .idea/
+web/node_modules/
+utils/demo.py
