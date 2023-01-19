@@ -15,6 +15,7 @@ from pyteal import (
     Assert,
     AssetHolding,
     AssetParam,
+    Balance,
     Bytes,
     Concat,
     Expr,
@@ -42,6 +43,10 @@ class ContractoriumPlatform(Application):
 
     manager: Final[ApplicationStateValue] = ApplicationStateValue(
         stack_type=TealType.bytes, default=Global.creator_address()
+    )
+
+    cut: Final[ApplicationStateValue] = ApplicationStateValue(
+        stack_type=TealType.uint64, default=Int(9800)
     )
 
     bounty_programs = Mapping(abi.Address, BountyProgram)
@@ -82,6 +87,15 @@ class ContractoriumPlatform(Application):
         The transaction can only succeed if the invoker is the current manager.
         """
         return self.manager.set(new_manager.get())
+
+    @external(authorize=Authorize.only(manager))
+    def set_cut(self, new_cut: abi.Uint64) -> Expr:
+        """
+        A function that accepts a new Algorand address and sets the manager to this address.
+
+        The transaction can only succeed if the invoker is the current manager.
+        """
+        return self.cut.set(new_cut.get())
 
     @external
     def create_bounty_program(
@@ -138,7 +152,7 @@ class ContractoriumPlatform(Application):
                     InnerTxnBuilder.Execute({
                         TxnField.type_enum: TxnType.Payment,
                         TxnField.receiver: Txn.sender(),
-                        TxnField.amount: calculate_cut(payment.get().amount(), Int(9800)),
+                        TxnField.amount: calculate_cut(payment.get().amount(), Int(9900)),
                         TxnField.note: Bytes("Contractorium: Not opted into Bounty asset, refunding bounty..")
                     }),
                     Approve()
@@ -149,7 +163,7 @@ class ContractoriumPlatform(Application):
                     InnerTxnBuilder.Execute({
                         TxnField.type_enum: TxnType.Payment,
                         TxnField.receiver: Txn.sender(),
-                        TxnField.amount: calculate_cut(payment.get().amount(), Int(9800)),
+                        TxnField.amount: calculate_cut(payment.get().amount(), Int(9900)),
                         TxnField.note: Bytes("Contractorium: Asset balance mismatch, refunding bounty..")
                     }),
                     Approve()
@@ -164,7 +178,7 @@ class ContractoriumPlatform(Application):
             InnerTxnBuilder.Execute({
                 TxnField.type_enum: TxnType.Payment,
                 TxnField.receiver: report_from.value(),
-                TxnField.amount: calculate_cut(payment.get().amount(), Int(9800)),
+                TxnField.amount: calculate_cut(payment.get().amount(), self.cut.get()),
                 TxnField.note: bounty_note.encode()
             }),
             InnerTxnBuilder.Execute(({
@@ -182,4 +196,16 @@ class ContractoriumPlatform(Application):
                 TxnField.config_asset_clawback: Global.zero_address(),
                 TxnField.config_asset_manager: report_to.value(),
             }),
+        )
+
+    @external
+    def payday(self) -> Expr:
+        """Function that will pay out a specified cut from the contract's address to the creator's address."""
+        return Seq(
+            InnerTxnBuilder.Execute({
+                TxnField.type_enum: TxnType.Payment,
+                TxnField.receiver: Global.creator_address(),
+                TxnField.amount: calculate_cut(Balance(self.address), self.cut.get()),
+                TxnField.note: Bytes("Payment from Contractorium")
+            })
         )
