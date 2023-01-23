@@ -1,6 +1,7 @@
 from typing import Final
 
-from beaker import Application, ApplicationStateValue, Authorize
+from beaker import Application, ApplicationStateValue, Authorize, sandbox, consts, client
+from algosdk.encoding import decode_address
 from beaker.decorators import (
     close_out,
     create,
@@ -110,8 +111,23 @@ class ContractoriumPlatform(Application):
         and a description of the program itself.
         """
         return Seq(
-            (new_bounty_program := BountyProgram()).set(name, description),
+            (verified_default := abi.make(abi.Bool)).set(False),
+            (new_bounty_program := BountyProgram()).set(name, description, verified_default),
             self.bounty_programs[Txn.sender()].set(new_bounty_program),
+        )
+
+    @external(authorize=Authorize.only(manager))
+    def verify_program(self, program: abi.Address, *, output: BountyProgram):
+        tmp_name = abi.String()
+        tmp_description = abi.String()
+        return Seq(
+            Assert(self.bounty_programs[program].exists()),
+            self.bounty_programs[Txn.sender()].store_into(output),
+            (output.name.store_into(tmp_name)),
+            (output.description.store_into(tmp_description)),
+            (verified := abi.make(abi.Bool)).set(True),
+            (modified_bounty_program := BountyProgram()).set(tmp_name, tmp_description, verified),
+            self.bounty_programs[program].set(modified_bounty_program),
         )
 
     @external
@@ -198,7 +214,7 @@ class ContractoriumPlatform(Application):
             }),
         )
 
-    @external
+    @external(authorize=Authorize.only(manager))
     def payday(self) -> Expr:
         """Function that will pay out a specified cut from the contract's address to the creator's address."""
         return Seq(
