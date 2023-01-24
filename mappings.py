@@ -7,3 +7,4 @@ class BountyProgram(abi.NamedTuple):
     name: abi.Field[abi.String]
     description: abi.Field[abi.String]
     verified: abi.Field[abi.Bool]
+    image: abi.Field[abi.String]
