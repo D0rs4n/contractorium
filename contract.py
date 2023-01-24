@@ -103,6 +103,7 @@ class ContractoriumPlatform(Application):
             self,
             name: abi.String,
             description: abi.String,
+            image: abi.String,
     ) -> Expr:
         """
         A method to create and store a bug bounty program on the Algorand Blockchain, using Boxes.
@@ -112,24 +113,45 @@ class ContractoriumPlatform(Application):
         """
         return Seq(
             (verified_default := abi.make(abi.Bool)).set(False),
-            (new_bounty_program := BountyProgram()).set(name, description, verified_default),
+            (new_bounty_program := BountyProgram()).set(name, description, verified_default, image),
             self.bounty_programs[Txn.sender()].set(new_bounty_program),
         )
 
     @external(authorize=Authorize.only(manager))
     def verify_program(self, program: abi.Address, *, output: BountyProgram):
+        """Verify a program, indicating the program is verified by the platform."""
         tmp_name = abi.String()
         tmp_description = abi.String()
+        tmp_image = abi.String()
         return Seq(
             Assert(self.bounty_programs[program].exists()),
             self.bounty_programs[Txn.sender()].store_into(output),
             (output.name.store_into(tmp_name)),
             (output.description.store_into(tmp_description)),
+            (output.image.store_into(tmp_image)),
             (verified := abi.make(abi.Bool)).set(True),
-            (modified_bounty_program := BountyProgram()).set(tmp_name, tmp_description, verified),
+            (modified_bounty_program := BountyProgram()).set(tmp_name, tmp_description, verified, tmp_image),
             self.bounty_programs[program].set(modified_bounty_program),
+            self.bounty_programs[Txn.sender()].store_into(output),
         )
 
+    @external
+    def set_program_image(self, image: abi.String, *, output: BountyProgram):
+        """Set a bounty programs image."""
+        tmp_name = abi.String()
+        tmp_description = abi.String()
+        tmp_verified = abi.Bool()
+        return Seq(
+            Assert(self.bounty_programs[Txn.sender()].exists()),
+            self.bounty_programs[Txn.sender()].store_into(output),
+            (output.name.store_into(tmp_name)),
+            (output.description.store_into(tmp_description)),
+            (output.verified.store_into(tmp_verified)),
+            (new_image := abi.make(abi.String)).set(image),
+            (modified_bounty_program := BountyProgram()).set(tmp_name, tmp_description, tmp_verified, new_image),
+            self.bounty_programs[Txn.sender()].set(modified_bounty_program),
+            self.bounty_programs[Txn.sender()].store_into(output),
+        )
     @external
     def create_report(self, to: abi.Address, title: abi.String, description: abi.String, *, output: abi.Uint64) -> Expr:
         """Create a report, which is represented as an Algorand Standard asset."""
@@ -225,3 +247,10 @@ class ContractoriumPlatform(Application):
                 TxnField.note: Bytes("Payment from Contractorium")
             })
         )
+
+def demo():
+
+    ContractoriumPlatform().dump(directory="dist")
+
+
+demo()
