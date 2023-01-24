@@ -112,6 +112,7 @@ class ContractoriumPlatform(Application):
         and a description of the program itself.
         """
         return Seq(
+            Assert(Not(self.bounty_programs[Txn.sender()].exists())),
             (verified_default := abi.make(abi.Bool)).set(False),
             (new_bounty_program := BountyProgram()).set(name, description, verified_default, image),
             self.bounty_programs[Txn.sender()].set(new_bounty_program),
@@ -247,10 +248,3 @@ class ContractoriumPlatform(Application):
                 TxnField.note: Bytes("Payment from Contractorium")
             })
         )
-
-def demo():
-
-    ContractoriumPlatform().dump(directory="dist")
-
-
-demo()
