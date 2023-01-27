@@ -137,19 +137,12 @@ class ContractoriumPlatform(Application):
         )
 
     @external
-    def set_program_image(self, image: abi.String, *, output: BountyProgram):
-        """Set a bounty programs image."""
-        tmp_name = abi.String()
-        tmp_description = abi.String()
-        tmp_verified = abi.Bool()
+    def edit_program(self, name: abi.String, description: abi.String, image: abi.String, *, output: BountyProgram):
+        """Edit a bounty program."""
         return Seq(
             Assert(self.bounty_programs[Txn.sender()].exists()),
-            self.bounty_programs[Txn.sender()].store_into(output),
-            (output.name.store_into(tmp_name)),
-            (output.description.store_into(tmp_description)),
-            (output.verified.store_into(tmp_verified)),
-            (new_image := abi.make(abi.String)).set(image),
-            (modified_bounty_program := BountyProgram()).set(tmp_name, tmp_description, tmp_verified, new_image),
+            (verified_default := abi.make(abi.Bool)).set(False),
+            (modified_bounty_program := BountyProgram()).set(name, description, verified_default, image),
             self.bounty_programs[Txn.sender()].set(modified_bounty_program),
             self.bounty_programs[Txn.sender()].store_into(output),
         )
