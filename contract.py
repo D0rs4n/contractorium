@@ -1,7 +1,6 @@
 from typing import Final
 
 from beaker import Application, ApplicationStateValue, Authorize, sandbox, consts, client
-from algosdk.encoding import decode_address
 from beaker.decorators import (
     close_out,
     create,
@@ -153,10 +152,12 @@ class ContractoriumPlatform(Application):
             self.bounty_programs[Txn.sender()].set(modified_bounty_program),
             self.bounty_programs[Txn.sender()].store_into(output),
         )
+
     @external
     def create_report(self, to: abi.Address, title: abi.String, description: abi.String, *, output: abi.Uint64) -> Expr:
         """Create a report, which is represented as an Algorand Standard asset."""
         return Seq(
+            Assert(to.length() != Int(0) and title.length() != Int(0) and description.length() != Int(0)),
             Assert(self.bounty_programs[to].exists()),
             InnerTxnBuilder.Execute({
                 TxnField.type_enum: TxnType.AssetConfig,
@@ -185,6 +186,7 @@ class ContractoriumPlatform(Application):
         Furthermore, if the PaymentTransaction's parameters are valid, the hunter will be paid.
         """
         return Seq(
+            Assert(bounty_note.length() != Int(0)),
             (asset_balance := AssetHolding.balance(Txn.sender(), Txn.assets[0])),
             If(Not(asset_balance.hasValue())).Then(
                 Seq(
@@ -248,3 +250,4 @@ class ContractoriumPlatform(Application):
                 TxnField.note: Bytes("Payment from Contractorium")
             })
         )
+
