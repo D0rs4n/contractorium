@@ -1,5 +1,6 @@
 from typing import Final
 
+import algosdk.mnemonic
 from beaker import Application, ApplicationStateValue, Authorize, sandbox, consts, client
 from beaker.decorators import (
     close_out,
@@ -138,10 +139,12 @@ class ContractoriumPlatform(Application):
     @external
     def edit_program(self, name: abi.String, description: abi.String, image: abi.String, *, output: BountyProgram):
         """Edit a bounty program."""
+        tmp_verified = abi.Bool()
         return Seq(
             Assert(self.bounty_programs[Txn.sender()].exists()),
-            (verified_default := abi.make(abi.Bool)).set(False),
-            (modified_bounty_program := BountyProgram()).set(name, description, verified_default, image),
+            (self.bounty_programs[Txn.sender()].store_into(output)),
+            (output.verified.store_into(tmp_verified)),
+            (modified_bounty_program := BountyProgram()).set(name, description, tmp_verified, image),
             self.bounty_programs[Txn.sender()].set(modified_bounty_program),
             self.bounty_programs[Txn.sender()].store_into(output),
         )
@@ -230,6 +233,14 @@ class ContractoriumPlatform(Application):
                 TxnField.config_asset_clawback: Global.zero_address(),
                 TxnField.config_asset_manager: report_to.value(),
             }),
+            InnerTxnBuilder.Execute(({
+                TxnField.type_enum: TxnType.AssetTransfer,
+                TxnField.xfer_asset: Txn.assets[0],
+                TxnField.asset_amount: Int(0),
+                TxnField.asset_receiver: self.address,
+                TxnField.asset_sender: self.address,
+                TxnField.asset_close_to: self.address
+            })),
         )
 
     @external(authorize=Authorize.only(manager))
@@ -243,4 +254,3 @@ class ContractoriumPlatform(Application):
                 TxnField.note: Bytes("Payment from Contractorium")
             })
         )
-
