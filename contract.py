@@ -1,6 +1,7 @@
 from typing import Final
 
 import algosdk.mnemonic
+from algosdk.encoding import decode_address
 from beaker import Application, ApplicationStateValue, Authorize, sandbox, consts, client
 from beaker.decorators import (
     close_out,
@@ -222,7 +223,7 @@ class ContractoriumPlatform(Application):
                 TxnField.type_enum: TxnType.AssetTransfer,
                 TxnField.xfer_asset: Txn.assets[0],
                 TxnField.asset_amount: Int(1),
-                TxnField.asset_receiver: report_to.value(),
+                TxnField.asset_receiver: report_from.value(),
                 TxnField.asset_sender: self.address
             })),
             InnerTxnBuilder.Execute({
@@ -254,3 +255,25 @@ class ContractoriumPlatform(Application):
                 TxnField.note: Bytes("Payment from Contractorium")
             })
         )
+def demo():
+    # Create an Application client
+    app_client = client.ApplicationClient(
+        # Get sandbox algod client
+        client=sandbox.get_algod_client(),
+        # Instantiate app with the program version (default is MAX_TEAL_VERSION)
+        app=ContractoriumPlatform(),
+        # Get acct from sandbox and pass the signer
+        signer=sandbox.get_accounts()[0].signer,
+    )
+
+    # Deploy the app on-chain
+    app_id, app_addr, txid = app_client.create()
+    print(
+        f"""fDeployed app in txid {txid}
+        App ID: {app_id}
+        Address: {app_addr}
+        """
+    )
+    app_client.fund(consts.algo * 300)
+
+demo()
