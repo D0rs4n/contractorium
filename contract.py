@@ -151,16 +151,16 @@ class ContractoriumPlatform(Application):
         )
 
     @external
-    def create_report(self, to: abi.Address, title: abi.String, description: abi.String, *, output: abi.Uint64) -> Expr:
+    def create_report(self, to: abi.Address, description: abi.String, *, output: abi.Uint64) -> Expr:
         """Create a report, which is represented as an Algorand Standard asset."""
         return Seq(
-            Assert(to.length() != Int(0) and title.length() != Int(0) and description.length() != Int(0)),
+            Assert(to.length() != Int(0) and description.length() != Int(0)),
             Assert(self.bounty_programs[to].exists()),
             InnerTxnBuilder.Execute({
                 TxnField.type_enum: TxnType.AssetConfig,
                 TxnField.config_asset_total: Int(1),
                 TxnField.config_asset_default_frozen: Int(0),
-                TxnField.config_asset_name: Concat(title.encode()),
+                TxnField.config_asset_name: Bytes("Bug Bounty report on Contractorium"),
                 TxnField.config_asset_unit_name: Bytes("BBRCntrm"),
                 TxnField.config_asset_reserve: to.encode(),
                 TxnField.config_asset_freeze: Txn.sender(),
@@ -275,5 +275,5 @@ def demo():
         """
     )
     app_client.fund(consts.algo * 300)
-
+    ContractoriumPlatform().dump(directory="dist")
 demo()
