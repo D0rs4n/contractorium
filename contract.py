@@ -160,7 +160,7 @@ class ContractoriumPlatform(Application):
                 TxnField.type_enum: TxnType.AssetConfig,
                 TxnField.config_asset_total: Int(1),
                 TxnField.config_asset_default_frozen: Int(0),
-                TxnField.config_asset_name: Bytes("Bug Bounty report on Contractorium"),
+                TxnField.config_asset_name: Bytes("BBRCntrm"),
                 TxnField.config_asset_unit_name: Bytes("BBRCntrm"),
                 TxnField.config_asset_reserve: to.encode(),
                 TxnField.config_asset_freeze: Txn.sender(),
