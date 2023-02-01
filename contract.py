@@ -223,7 +223,7 @@ class ContractoriumPlatform(Application):
                 TxnField.type_enum: TxnType.AssetTransfer,
                 TxnField.xfer_asset: Txn.assets[0],
                 TxnField.asset_amount: Int(1),
-                TxnField.asset_receiver: report_from.value(),
+                TxnField.asset_receiver: report_to.value(),
                 TxnField.asset_sender: self.address
             })),
             InnerTxnBuilder.Execute({
