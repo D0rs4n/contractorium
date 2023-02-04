@@ -1,6 +1,7 @@
 from typing import Final
 
 import algosdk.mnemonic
+from algosdk.atomic_transaction_composer import AtomicTransactionComposer, TransactionWithSigner
 from algosdk.encoding import decode_address
 from beaker import Application, ApplicationStateValue, Authorize, sandbox, consts, client
 from beaker.decorators import (
@@ -192,40 +193,12 @@ class ContractoriumPlatform(Application):
         return Seq(
             Assert(bounty_note.length() != Int(0)),
             (asset_balance := AssetHolding.balance(Txn.sender(), Txn.assets[0])),
-            If(Not(asset_balance.hasValue())).Then(
-                Seq(
-                    InnerTxnBuilder.Execute({
-                        TxnField.type_enum: TxnType.Payment,
-                        TxnField.receiver: Txn.sender(),
-                        TxnField.amount: payment.get().amount(),
-                        TxnField.note: Bytes("Contractorium: Not opted into Bounty asset, refunding bounty..")
-                    }),
-                    Approve()
-                )
-            ),
-            If(Not(asset_balance.value() == Int(0))).Then(
-                Seq(
-                    InnerTxnBuilder.Execute({
-                        TxnField.type_enum: TxnType.Payment,
-                        TxnField.receiver: Txn.sender(),
-                        TxnField.amount: calculate_cut(payment.get().amount(), Int(9900)),
-                        TxnField.note: Bytes("Contractorium: Asset balance mismatch, refunding bounty..")
-                    }),
-                    Approve()
-                )),
+            Assert(asset_balance.hasValue()),
+            Assert(asset_balance.value() == Int(0)),
             (report_to := AssetParam.reserve(Txn.assets[0])),
             (report_from := AssetParam.freeze(Txn.assets[0])),
-            If(Not(report_to.value() == Txn.sender())).Then(
-                Seq(
-                    InnerTxnBuilder.Execute({
-                        TxnField.type_enum: TxnType.Payment,
-                        TxnField.receiver: Txn.sender(),
-                        TxnField.amount: calculate_cut(payment.get().amount(), Int(9900)),
-                        TxnField.note: Bytes("Contractorium: Payment sender mismatch, refunding bounty..")
-                    }),
-                    Approve()
-                )),
             Assert(report_to.hasValue()),
+            Assert(report_to.value() == Txn.sender()),
             Assert(report_from.hasValue()),
             Assert(self.bounty_programs[report_to.value()].exists()),
             Assert(payment.get().sender() == Txn.sender()),
@@ -236,29 +209,11 @@ class ContractoriumPlatform(Application):
                 TxnField.amount: calculate_cut(payment.get().amount(), self.cut.get()),
                 TxnField.note: bounty_note.encode()
             }),
-            InnerTxnBuilder.Execute(({
-                TxnField.type_enum: TxnType.AssetTransfer,
-                TxnField.xfer_asset: Txn.assets[0],
-                TxnField.asset_amount: Int(1),
-                TxnField.asset_receiver: report_to.value(),
-                TxnField.asset_sender: self.address
-            })),
             InnerTxnBuilder.Execute({
                 TxnField.type_enum: TxnType.AssetConfig,
                 TxnField.config_asset: Txn.assets[0],
-                TxnField.config_asset_reserve: Global.zero_address(),
-                TxnField.config_asset_freeze: Global.zero_address(),
-                TxnField.config_asset_clawback: Global.zero_address(),
-                TxnField.config_asset_manager: report_to.value(),
             }),
-            InnerTxnBuilder.Execute(({
-                TxnField.type_enum: TxnType.AssetTransfer,
-                TxnField.xfer_asset: Txn.assets[0],
-                TxnField.asset_amount: Int(0),
-                TxnField.asset_receiver: self.address,
-                TxnField.asset_sender: self.address,
-                TxnField.asset_close_to: self.address
-            })),
+
         )
 
     @external(authorize=Authorize.only(manager))
@@ -273,26 +228,3 @@ class ContractoriumPlatform(Application):
             })
         )
 
-
-def demo():
-    ContractoriumPlatform().dump(directory="dist")
-    app_client = client.ApplicationClient(
-        # Get sandbox algod client
-        client=sandbox.get_algod_client(),
-        # Instantiate app with the program version (default is MAX_TEAL_VERSION)
-        app=ContractoriumPlatform(),
-        # Get acct from sandbox and pass the signer
-        signer=sandbox.get_accounts()[0].signer,
-    )
-
-    # Deploy the app on-chain
-    app_id, app_addr, txid = app_client.create()
-    print(
-        f"""fDeployed app in txid {txid}
-            App ID: {app_id}
-            Address: {app_addr}
-            """
-    )
-    app_client.fund(consts.algo * 300)
-
-demo()
