@@ -19,7 +19,6 @@ from pyteal import (
     AssetParam,
     Balance,
     Bytes,
-    Concat,
     Expr,
     Global,
     If,
@@ -151,6 +150,14 @@ class ContractoriumPlatform(Application):
         )
 
     @external
+    def delete_program(self) -> Expr:
+        """A contract method to delete a Bug Bounty program."""
+        return Seq(
+            Assert(self.bounty_programs[Txn.sender()].exists()),
+            Assert(self.bounty_programs[Txn.sender()].delete()),
+        )
+
+    @external
     def create_report(self, to: abi.Address, description: abi.String, *, output: abi.Uint64) -> Expr:
         """Create a report, which is represented as an Algorand Standard asset."""
         return Seq(
@@ -190,7 +197,7 @@ class ContractoriumPlatform(Application):
                     InnerTxnBuilder.Execute({
                         TxnField.type_enum: TxnType.Payment,
                         TxnField.receiver: Txn.sender(),
-                        TxnField.amount: calculate_cut(payment.get().amount(), Int(9900)),
+                        TxnField.amount: payment.get().amount(),
                         TxnField.note: Bytes("Contractorium: Not opted into Bounty asset, refunding bounty..")
                     }),
                     Approve()
@@ -208,9 +215,19 @@ class ContractoriumPlatform(Application):
                 )),
             (report_to := AssetParam.reserve(Txn.assets[0])),
             (report_from := AssetParam.freeze(Txn.assets[0])),
+            If(Not(report_to.value() == Txn.sender())).Then(
+                Seq(
+                    InnerTxnBuilder.Execute({
+                        TxnField.type_enum: TxnType.Payment,
+                        TxnField.receiver: Txn.sender(),
+                        TxnField.amount: calculate_cut(payment.get().amount(), Int(9900)),
+                        TxnField.note: Bytes("Contractorium: Payment sender mismatch, refunding bounty..")
+                    }),
+                    Approve()
+                )),
             Assert(report_to.hasValue()),
+            Assert(report_from.hasValue()),
             Assert(self.bounty_programs[report_to.value()].exists()),
-            Assert(report_to.value() == Txn.sender()),
             Assert(payment.get().sender() == Txn.sender()),
             Assert(payment.get().receiver() == self.address),
             InnerTxnBuilder.Execute({
@@ -255,8 +272,10 @@ class ContractoriumPlatform(Application):
                 TxnField.note: Bytes("Payment from Contractorium")
             })
         )
+
+
 def demo():
-    # Create an Application client
+    ContractoriumPlatform().dump(directory="dist")
     app_client = client.ApplicationClient(
         # Get sandbox algod client
         client=sandbox.get_algod_client(),
@@ -270,10 +289,10 @@ def demo():
     app_id, app_addr, txid = app_client.create()
     print(
         f"""fDeployed app in txid {txid}
-        App ID: {app_id}
-        Address: {app_addr}
-        """
+            App ID: {app_id}
+            Address: {app_addr}
+            """
     )
     app_client.fund(consts.algo * 300)
-    ContractoriumPlatform().dump(directory="dist")
+
 demo()
