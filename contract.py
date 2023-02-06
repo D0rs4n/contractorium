@@ -1,8 +1,6 @@
 from typing import Final
 
-import algosdk.mnemonic
-from algosdk.atomic_transaction_composer import AtomicTransactionComposer, TransactionWithSigner
-from algosdk.encoding import decode_address
+from algosdk.v2client import algod
 from beaker import Application, ApplicationStateValue, Authorize, sandbox, consts, client
 from beaker.decorators import (
     close_out,
@@ -14,6 +12,7 @@ from beaker.decorators import (
 )
 from beaker.lib.storage import Mapping
 from pyteal import (
+    Or,
     Approve,
     Assert,
     AssetHolding,
@@ -22,7 +21,6 @@ from pyteal import (
     Bytes,
     Expr,
     Global,
-    If,
     InnerTxn,
     InnerTxnBuilder,
     Int,
@@ -159,6 +157,23 @@ class ContractoriumPlatform(Application):
         )
 
     @external
+    def delete_report(self) -> Expr:
+        """A contract method to delete a Bug Bounty report by the reporter."""
+        return Seq(
+            (asset_balance := AssetHolding.balance(self.address, Txn.assets[0])),
+            Assert(asset_balance.hasValue()),
+            (report_from := AssetParam.freeze(Txn.assets[0])),
+            (report_to := AssetParam.reserve(Txn.assets[0])),
+            Assert(report_from.hasValue()),
+            Assert(report_to.hasValue()),
+            Assert(Or(report_from.value() == Txn.sender(), (report_to.value() == Txn.sender()))),
+            InnerTxnBuilder.Execute({
+                TxnField.type_enum: TxnType.AssetConfig,
+                TxnField.config_asset: Txn.assets[0],
+            }),
+        )
+
+    @external
     def create_report(self, to: abi.Address, description: abi.String, *, output: abi.Uint64) -> Expr:
         """Create a report, which is represented as an Algorand Standard asset."""
         return Seq(
@@ -191,18 +206,28 @@ class ContractoriumPlatform(Application):
         Furthermore, if the PaymentTransaction's parameters are valid, the hunter will be paid.
         """
         return Seq(
+            # Make sure there is an asset attached to the txn.
+            Assert(Not(Txn.assets.length() == Int(0))),
+
             Assert(bounty_note.length() != Int(0)),
-            (asset_balance := AssetHolding.balance(Txn.sender(), Txn.assets[0])),
-            Assert(asset_balance.hasValue()),
-            Assert(asset_balance.value() == Int(0)),
+            # Query the Report relations. (Reporter, program manager)
+
             (report_to := AssetParam.reserve(Txn.assets[0])),
             (report_from := AssetParam.freeze(Txn.assets[0])),
+            # Make sure those relations exist
+
             Assert(report_to.hasValue()),
             Assert(report_to.value() == Txn.sender()),
             Assert(report_from.hasValue()),
+
+            # Make sure the box does exist, for the program.
             Assert(self.bounty_programs[report_to.value()].exists()),
+
+            # Payment validation.
             Assert(payment.get().sender() == Txn.sender()),
             Assert(payment.get().receiver() == self.address),
+
+            # Bounty payout, with the current cut defined in the "cut" application state value.
             InnerTxnBuilder.Execute({
                 TxnField.type_enum: TxnType.Payment,
                 TxnField.receiver: report_from.value(),
@@ -227,4 +252,3 @@ class ContractoriumPlatform(Application):
                 TxnField.note: Bytes("Payment from Contractorium")
             })
         )
-
