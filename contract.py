@@ -164,9 +164,13 @@ class ContractoriumPlatform(Application):
             Assert(asset_balance.hasValue()),
             (report_from := AssetParam.freeze(Txn.assets[0])),
             (report_to := AssetParam.reserve(Txn.assets[0])),
+            (report_self := AssetParam.manager(Txn.assets[0])),
+
             Assert(report_from.hasValue()),
             Assert(report_to.hasValue()),
+            Assert(report_self.hasValue()),
             Assert(Or(report_from.value() == Txn.sender(), (report_to.value() == Txn.sender()))),
+            Assert(report_self.value() == self.address),
             InnerTxnBuilder.Execute({
                 TxnField.type_enum: TxnType.AssetConfig,
                 TxnField.config_asset: Txn.assets[0],
@@ -214,10 +218,12 @@ class ContractoriumPlatform(Application):
 
             (report_to := AssetParam.reserve(Txn.assets[0])),
             (report_from := AssetParam.freeze(Txn.assets[0])),
+            (report_self := AssetParam.manager(Txn.assets[0])),
             # Make sure those relations exist
 
             Assert(report_to.hasValue()),
             Assert(report_to.value() == Txn.sender()),
+            Assert(report_self == self.address),
             Assert(report_from.hasValue()),
 
             # Make sure the box does exist, for the program.
