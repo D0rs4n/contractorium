@@ -222,9 +222,10 @@ class ContractoriumPlatform(Application):
             # Make sure those relations exist
 
             Assert(report_to.hasValue()),
-            Assert(report_to.value() == Txn.sender()),
-            Assert(report_self == self.address),
             Assert(report_from.hasValue()),
+            Assert(report_self.hasValue()),
+            Assert(report_to.value() == Txn.sender()),
+            Assert(report_self.value() == self.address),
 
             # Make sure the box does exist, for the program.
             Assert(self.bounty_programs[report_to.value()].exists()),
