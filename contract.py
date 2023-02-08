@@ -156,6 +156,14 @@ class ContractoriumPlatform(Application):
             Assert(self.bounty_programs[Txn.sender()].delete()),
         )
 
+    @external(authorize=Authorize.only(manager))
+    def delete_program_admin(self, program: abi.Address) -> Expr:
+        """A contract method to delete any Bug Bounty program, as an admin"""
+        return Seq(
+            Assert(self.bounty_programs[program].exists()),
+            Assert(self.bounty_programs[program].delete()),
+        )
+
     @external
     def delete_report(self) -> Expr:
         """A contract method to delete a Bug Bounty report by the reporter."""
